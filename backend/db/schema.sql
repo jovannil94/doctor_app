@@ -10,5 +10,9 @@ CREATE TABLE doctors (
     firstName VARCHAR(25),
     lastName VARCHAR(25),
     gender VARCHAR(10),
-    DOB JSONB
+    DOB DATE
 );
+
+CREATE INDEX idx_doctors_firstName ON doctors (firstName);
+
+CREATE INDEX idx_doctors_lastName ON doctors (lastName);

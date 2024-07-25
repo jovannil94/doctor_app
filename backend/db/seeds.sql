@@ -3,5 +3,7 @@
 INSERT INTO doctors
     (firstname, lastname, gender, DOB)
 VALUES
-    ('Jack', 'Smith', 'Male', '{"month": 01, "day": 11, "year": 1970}'),
-    ('Ally', 'Love', 'Female', '{"month": 11, "day": 01, "year": 1989}');
+    ('John', 'Doe', 'Male', '1980-05-15'),
+    ('Jane', 'Smith', 'Female', '1990-11-23'),
+    ('Jack', 'Brown', 'Male', '1975-04-10'),
+    ('Jill', 'Johnson', 'Female', '1985-02-20');

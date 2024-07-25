@@ -38,6 +38,37 @@ const getOneDoctor = async (req, res, next) => {
     }
 }
 
+const getSearchDoctors = async (req, res, next) => {
+    try {
+        const { query } = req.query;
+        if (!query) {
+            return res.status(400).json({ error: 'Query parameter is required' });
+        }
 
+        const searchTerms = query.split(' ').map(term => `%${term}%`);
+        
+        const conditions = searchTerms.map((term, index) => {
+            return `firstName ILIKE $${index + 1} OR lastName ILIKE $${index + 1}`;
+        }).join(' OR ');
 
-module.exports = { getAllDoctors, getOneDoctor };
+        const doctors = await db.any(
+            `SELECT * FROM doctors WHERE ${conditions}`,
+            searchTerms
+        );
+
+        res.status(200).json({
+            status: 'Success',
+            message: 'Doctors with similar names',
+            payload: doctors
+        });
+    } catch (error) {
+        res.status(400).json({
+            status: "Error",
+            message: "Couldn't retrieve doctors",
+            payload: error
+        })
+        next(error);
+    }
+};
+
+module.exports = { getAllDoctors, getOneDoctor, getSearchDoctors };

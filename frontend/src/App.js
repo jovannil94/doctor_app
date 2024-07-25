@@ -1,6 +1,6 @@
 import React from 'react';
 import Selections from './components/Selections';
-import './App.css';
+import './css/App.css';
 
 function App() {
   return (
