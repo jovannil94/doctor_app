@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { getAPI } from '../util/getAPI';
 import axios from 'axios';
-import jsPDF from 'jspdf';
+import { PDFDocument } from 'pdf-lib';
 import '../css/Selection.css';
 
 const Dropdowns = () => {
@@ -9,6 +9,30 @@ const Dropdowns = () => {
     const [matchingDoctors, setMatchingDoctors] = useState([]);
     const [selectedDoctor, setSelectedDoctor] = useState(null);
     const [selectedState, setSelectedState] = useState(null);
+
+    const stateFormMap = {
+        NY: {
+            "dhFormfield-2749128176": (doctor) => doctor.firstname,
+            "dhFormfield-2749128805": (doctor) => doctor.lastname,
+            "dhFormfield-2749128809": (doctor) => doctor.gender,
+            "dhFormfield-2749129177": (doctor) => {
+                const date = new Date(doctor.dob);
+                return `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`;
+            }
+        },
+        CA: {
+            "dhFormfield-2749127007": (doctor) => `${doctor.firstname} ${doctor.lastname}`,
+            /*
+            dhFormfield-2749127036 Male check box
+            FdhFormfield-2749127702 Female check box
+            */
+            "dhFormfield-2749127036": (doctor) => doctor.gender,
+            "dhFormfield-2749127704": (doctor) => {
+                const date = new Date(doctor.dob);
+                return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
+            }
+        }
+    };
 
     useEffect(() => {
         if (searchQuery.length > 0) {
@@ -20,7 +44,7 @@ const Dropdowns = () => {
                 } catch (error) {
                     console.log(error);
                 }
-            }
+            };
             fetchMatchingDoctors();
         } else {
             setMatchingDoctors([]);
@@ -29,7 +53,7 @@ const Dropdowns = () => {
 
     const handleDoctorSearchChange = (e) => {
         setSearchQuery(e.target.value);
-        setSelectedDoctor(null); // Clear selected doctor on new search
+        setSelectedDoctor(null);
     };
 
     const handleDoctorSelect = (doctor) => {
@@ -40,33 +64,32 @@ const Dropdowns = () => {
         setSelectedState(e.target.value);
     };
 
-    const formatDoctorInfo = (state, doctor) => {
-        const stateFormMap = {
-            NY: {
-                "First Name": () => doctor.firstname,
-                "Last Name": () => doctor.lastname,
-                "Gender": () => doctor.gender,
-                "Date of Birth (mm/dd/yyyy)": () => doctor.dob.toISOString().split('T')[0]
-            },
-            CA: {
-                "Full Name": () => `${doctor.firstname} ${doctor.lastname}`,
-                "Gender": () => doctor.gender,
-                "Date of Birth (yyyy-mm-dd)": () => doctor.dob.toISOString().split('T')[0]
-            }
-        };
-
+    const fillPdfForm = async (doctor, state) => {
+        const url = `../formTemplates/${state}.pdf`;
+        const existingPdfBytes = await fetch(url).then(res => res.arrayBuffer());
+    
+        const pdfDoc = await PDFDocument.load(existingPdfBytes);
+        const form = pdfDoc.getForm();
+    
         const stateForm = stateFormMap[state];
         if (!stateForm) {
             throw new Error(`No form found for state: ${state}`);
         }
-
-        const formattedDoctor = {};
-        for (const [field, getValue] of Object.entries(stateForm)) {
-            formattedDoctor[field] = getValue();
+    
+        for (const [fieldName, getValue] of Object.entries(stateForm)) {
+            const field = form.getTextField(fieldName);
+            if (field) {
+                field.setText(getValue(doctor));
+            }
         }
-
-        return formattedDoctor;
-    };
+    
+        const pdfBytes = await pdfDoc.save();
+        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `${state}-${doctor.firstname}-${doctor.lastname}.pdf`;
+        link.click();
+    };    
 
     const handleSaveToPDF = async () => {
         const API = getAPI();
@@ -74,12 +97,7 @@ const Dropdowns = () => {
             try {
                 const res = await axios.get(`${API}/doctors/${selectedDoctor.id}`);
                 const doctorDetails = res.data.payload;
-                const formattedDoctor = formatDoctorInfo(selectedState, doctorDetails);
-
-                const doc = new jsPDF();
-                const content = JSON.stringify(formattedDoctor, null, 2);
-                doc.text(content, 10, 10);
-                doc.save(`${selectedState}-${doctorDetails.firstname}-${doctorDetails.lastname}.pdf`);
+                await fillPdfForm(doctorDetails, selectedState);
             } catch (error) {
                 console.error('Error fetching doctor details:', error);
             }
@@ -119,7 +137,7 @@ const Dropdowns = () => {
                             <h2>Selected Doctor:</h2>
                             <p>{selectedDoctor.firstname} {selectedDoctor.lastname}</p>
                             <p>Gender: {selectedDoctor.gender}</p>
-                            <p>Date of Birth: {selectedDoctor.dob.split('T')[0]}</p>
+                            <p>Date of Birth: {new Date(selectedDoctor.dob).toLocaleDateString()}</p>
                         </div>
                     )}
                 </div>
@@ -130,7 +148,7 @@ const Dropdowns = () => {
                         value={selectedState || ''}
                         onChange={handleStateChange}
                     >
-                        <option value="" disabled>State</option>
+                        <option value="" disabled>Select a state</option>
                         <option value="CA">California</option>
                         <option value="NY">New York</option>
                     </select>
